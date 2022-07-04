@@ -1,2 +1,2 @@
-# LightAmp-Updater
-LightAmp-Updater
+# Updater
+As simple updater
