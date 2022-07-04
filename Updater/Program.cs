@@ -52,7 +52,7 @@ void main(void)
 
         static void Main(string[] args)
         {
-            bool debug = true;
+            bool debug = false;
             var datas = ReadConfig(debug);
 
             if (!debug)
@@ -182,20 +182,20 @@ void main(void)
             }
 
             HttpClient Client = new HttpClient();
-            var x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/Updater/main/Updater/Data/Tune.info").Result;
+            var x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/LightAmp-Updater/main/Updater/Data/Tune.info").Result;
             StreamReader sr = new StreamReader(x);
             string file = sr.ReadToEnd();
             x.Close();
             sr.Close();
 
-            var binary = Client.GetStreamAsync("https://github.com/GiR-Zippo/Updater/raw/main/Updater/Data/" + file).Result;
+            var binary = Client.GetStreamAsync("https://github.com/GiR-Zippo/LightAmp-Updater/raw/main/Updater/Data/" + file).Result;
             string result = Path.GetTempPath();
             FileStream fileStream = new FileStream(result + file, FileMode.Create, FileAccess.Write);
             binary.CopyTo(fileStream);
             fileStream.Close();
             modfile = result + file;
 
-            x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/Updater/main/Updater/Data/Shader.frag").Result;
+            x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/LightAmp-Updater/main/Updater/Data/Shader.frag").Result;
             sr = new StreamReader(x);
             shader = sr.ReadToEnd();
             x.Close();
