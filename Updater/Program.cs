@@ -11,6 +11,7 @@ using System.Windows;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Net.Http.Headers;
 
 namespace Updater
 {
@@ -176,12 +177,17 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\4mat-truck_is_jarig.xm";
-                shader = File.ReadAllText(@"Data\ShaderAmp.frag");
+                modfile = @"Data\beach.xm";
+                shader = File.ReadAllText(@"Data\ShaderAmp1034.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }
 
             HttpClient Client = new HttpClient();
+            Client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
+            {
+                NoCache = true
+            };
+
             var x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/LightAmp-Updater/main/Updater/Data/Tune.info").Result;
             StreamReader sr = new StreamReader(x);
             string file = sr.ReadToEnd();
@@ -213,6 +219,11 @@ void main(void)
 
             //Check for new versions
             HttpClient Client = new HttpClient();
+            Client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
+            {
+                NoCache = true
+            };
+
             var x = Client.GetStreamAsync("https://raw.githubusercontent.com/GiR-Zippo/LightAmp/master/BardMusicPlayer.Ui/Properties/AssemblyInfo.cs");
 
             StreamReader sr = new StreamReader(x.Result);
@@ -236,13 +247,11 @@ void main(void)
                 {
                     if (version == gitversion)
                     {
-                        result = MessageBox.Show("Your version is up to date\r\n", "Updater", MessageBoxButton.YesNo);
+                        result = MessageBox.Show("Your version is up to date\r\n", "Updater", MessageBoxButton.OK);
                         switch (result)
                         {
                             case MessageBoxResult.OK:
                                 Environment.Exit(0);
-                                break;
-                            case MessageBoxResult.No:
                                 break;
                         }
                         return;
@@ -253,6 +262,11 @@ void main(void)
 
             //Download & install the latest version
             Client = new HttpClient();
+            Client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
+            {
+                NoCache = true
+            };
+
             Stream zippedStream = await Client.GetStreamAsync(new Uri(@"https://github.com/GiR-Zippo/LightAmp/releases/download/" + gitversion + "/LightAmp" + gitversion + ".zip"));
 
             using (var archive = new ZipArchive(zippedStream))

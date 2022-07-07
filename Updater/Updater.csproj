@@ -276,12 +276,21 @@
     <None Include="Data\80616-industrial.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Data\beach.xm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\m-fp.xm" />
     <None Include="Data\Shader.frag" />
-    <None Include="Data\ShaderAmp.frag">
+    <None Include="Data\ShaderAmp1033.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\ShaderAmp1034.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Data\Tune.info" />
+    <None Include="Data\WTF2.XM">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="libraries\freeglut.dll.config" />
     <None Include="libraries\OpenGL.dll.config" />
     <None Include="libraries\Tao.FreeGlut.dll.config" />
