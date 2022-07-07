@@ -1660,7 +1660,7 @@ float scroll(vec2 uv) {
 
 	float col = 0.;
 
-	_(L)_(I)_(G)_(H)_(T)_(A)_(M)_(P)_(dot)_(B)_(R)_(O)_(U)_(G)_(T)_(dot)_(T)_(O)_(dot)_(U)_(dot)_(B)_(Y)_(dot)_(T)_(H)_(E)_(dot)_(B)_(O)_(L)_(dot)_(dot)_(dot)_(H)_(A)_(P)_(P)_(Y)_(dot)
+	_(L)_(I)_(G)_(H)_(T)_(A)_(M)_(P)_(dot)_(W)_(A)_(S)_(dot)_(B)_(R)_(O)_(U)_(G)_(T)_(dot)_(T)_(O)_(dot)_(U)_(dot)_(B)_(Y)_(dot)_(T)_(H)_(E)_(dot)_(B)_(O)_(L)_(dot)_(dot)_(dot)_(H)_(A)_(P)_(P)_(Y)_(dot)
     _(B)_(A)_(R)_(D)_(I)_(N)_(G)_(dot)
 
 	return pow(col,3.)*1.66*(sin(iTime)*0.5+0.7);
