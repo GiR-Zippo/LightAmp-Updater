@@ -177,7 +177,7 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\beach.xm";
+                modfile = @"Data\summer_memories_3.xm";
                 shader = File.ReadAllText(@"Data\ShaderAmp1034.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }
