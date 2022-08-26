@@ -1,4 +1,6 @@
-﻿/*
+﻿#version 330
+
+/*
  * Original shader from: https://www.shadertoy.com/view/lt2Bz3
  */
 
