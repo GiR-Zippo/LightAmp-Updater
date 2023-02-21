@@ -64,7 +64,6 @@ namespace SharpMik.Player
 		{
 			m_CommandLine = command;
 			ModDriver.LoadDriver<T>();
-
 			return ModDriver.MikMod_Init(command);
 		}
 
@@ -72,9 +71,7 @@ namespace SharpMik.Player
 		{
 			m_CommandLine = command;
 			T driver = ModDriver.LoadDriver<T>();
-
 			result = ModDriver.MikMod_Init(command);
-
 			return driver;
 		}
 

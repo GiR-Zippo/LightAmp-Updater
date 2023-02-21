@@ -12,6 +12,9 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
+using System.Runtime.InteropServices.ComTypes;
+using NAudio.CoreAudioApi;
+using System.Runtime.InteropServices;
 
 namespace Updater
 {
@@ -71,6 +74,7 @@ void main(void)
             {
                 Console.WriteLine(ex);
             }
+
             m_Mod = m_Player.LoadModule(datas.Value);
             m_Mod.wrap = true;
             string FragmentShader = datas.Key;
@@ -177,8 +181,8 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\summer_memories_3.xm";
-                shader = File.ReadAllText(@"Data\ShaderAmp1034.frag");
+                modfile = @"Data\toilet3.xm";
+                shader = File.ReadAllText(@"Data\Shader.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }
 
