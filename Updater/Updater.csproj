@@ -279,8 +279,22 @@
     <None Include="Data\beach.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Data\cocio_finsprit.xm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\m-fp.xm" />
-    <None Include="Data\Shader.frag" />
+    <None Include="Data\ShaderAmp1051.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\Shader-wtf.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\ShaderAmp1049.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\Shader.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\ShaderAmp1033.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -301,6 +315,9 @@
     <None Include="libraries\OpenGL.dll.config" />
     <None Include="libraries\Tao.FreeGlut.dll.config" />
     <None Include="packages.config" />
+    <None Include="Data\toilet3.xm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpMik\SharpMik.csproj">

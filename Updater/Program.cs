@@ -181,7 +181,7 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\toilet3.xm";
+                modfile = @"Data\cocio_finsprit.xm";
                 shader = File.ReadAllText(@"Data\Shader.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }
