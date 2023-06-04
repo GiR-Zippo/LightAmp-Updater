@@ -181,7 +181,7 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\cocio_finsprit.xm";
+                modfile = @"Data\symmetric4.xm";
                 shader = File.ReadAllText(@"Data\Shader.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }

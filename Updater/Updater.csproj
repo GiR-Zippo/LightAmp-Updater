@@ -257,13 +257,9 @@
     <Content Include="iconp.ico" />
     <None Include="App.config" />
     <None Include="app.manifest" />
-    <None Include="Data\4mat-truck_is_jarig.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="Data\4mat-truck_is_jarig.xm" />
     <None Include="Data\4mat_-_broken_heart.xm" />
-    <Content Include="Data\grookles_chips.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Content Include="Data\grookles_chips.xm" />
     <Content Include="Data\Shader_test.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -273,16 +269,13 @@
     <Content Include="Data\Shader157.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <None Include="Data\80616-industrial.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Data\beach.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="Data\cocio_finsprit.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="Data\80616-industrial.xm" />
+    <None Include="Data\beach.xm" />
+    <None Include="Data\cocio_finsprit.xm" />
     <None Include="Data\m-fp.xm" />
+    <None Include="Data\ShaderAmp1053.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\ShaderAmp1051.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -304,20 +297,17 @@
     <None Include="Data\ShaderAmp1034.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Data\summer_memories_3.xm">
+    <None Include="Data\summer_memories_3.xm" />
+    <None Include="Data\symmetric4.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Data\Tune.info" />
-    <None Include="Data\WTF2.XM">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="Data\WTF2.XM" />
     <None Include="libraries\freeglut.dll.config" />
     <None Include="libraries\OpenGL.dll.config" />
     <None Include="libraries\Tao.FreeGlut.dll.config" />
     <None Include="packages.config" />
-    <None Include="Data\toilet3.xm">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Include="Data\toilet3.xm" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharpMik\SharpMik.csproj">
