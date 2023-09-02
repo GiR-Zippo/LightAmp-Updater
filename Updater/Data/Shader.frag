@@ -1,7 +1,7 @@
-﻿//symmetric4.xm
-#version 330
-
-#extension GL_OES_standard_derivatives : enable
+﻿//external.xm
+/*
+ * Original shader from: https://www.shadertoy.com/view/XtfGzj
+ */
 
 #ifdef GL_ES
 precision highp float;
@@ -11,555 +11,645 @@ precision highp float;
 uniform float time;
 uniform vec2 resolution;
 
-// shadertoy emulation
+// shadertoy globals
 #define iTime time/1000
 #define iResolution resolution
+const vec4  iMouse = vec4(0.0);
 
 // Emulate a black texture
 #define texture(s, uv) vec4(0.0)
 
-// Emulate some GLSL ES 3.x
-vec3 tanh(vec3 x) {
-    vec3 ex = exp(2.0 * x);
-    return ((ex - 1.) / (ex + 1.));
-}
-
 // --------[ Original ShaderToy begins here ]---------- //
-// CC0 - Neonwave sunrise
-//  Inspired by a tweet by I wanted to create something that looked
-//  a bit like the tweet. This is the result.
+// "Space Racing Lite"  
 
-#define RESOLUTION    iResolution
-#define TIME          iTime
-#define PI            3.141592654
-#define TAU           (2.0*PI)
+// Distance function and initial design for space car is by eiffie:
+// https://www.shadertoy.com/view/ldjGRh
+// the rest is by me but he also helped to optimize the code.
 
-#define SHOW_FFT
+// I removed some features by default because the original was crashing the Shadertoy browser
+// for win7 users - try commenting this lines to see if the full version compiles for you: 
+
+//#define LOW_QUALITY // No reflections, no shadows, no planet, reduced ray steps & detail
+//#define NO_HUD 
+
+#define LOOP_BREAKS // Could speed up, speed down, or just make your browser crash!
 
 
-// License: WTFPL, author: sam hocevar, found: https://stackoverflow.com/a/17897228/418488
-const vec4 hsv2rgb_K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-vec3 hsv2rgb(vec3 c) {
-  vec3 p = abs(fract(c.xxx + hsv2rgb_K.xyz) * 6.0 - hsv2rgb_K.www);
-  return c.z * mix(hsv2rgb_K.xxx, clamp(p - hsv2rgb_K.xxx, 0.0, 1.0), c.y);
-}
-// License: WTFPL, author: sam hocevar, found: https://stackoverflow.com/a/17897228/418488
-//  Macro version of above to enable compile-time constants
-#define HSV2RGB(c)  (c.z * mix(hsv2rgb_K.xxx, clamp(abs(fract(c.xxx + hsv2rgb_K.xyz) * 6.0 - hsv2rgb_K.www) - hsv2rgb_K.xxx, 0.0, 1.0), c.y))
 
-// License: Unknown, author: Unknown, found: don't remember
-vec4 alphaBlend(vec4 back, vec4 front) {
-  float w = front.w + back.w*(1.0-front.w);
-  vec3 xyz = (front.xyz*front.w + back.xyz*back.w*(1.0-front.w))/w;
-  return w > 0.0 ? vec4(xyz, w) : vec4(0.0);
-}
+#ifdef LOW_QUALITY
+	#define RAY_STEPS 65
+	#define SHADOW_STEPS 0
+	#define ITERATIONS 5
+	#define MAX_DIST 30.
+#else
+	#define RAY_STEPS 75
+	#define SHADOW_STEPS 40
+	#define ITERATIONS 6
+	#define MAX_DIST 35.
+#endif
+#define LIGHT_COLOR vec3(1.,.85,.6)
+#define AMBIENT_COLOR vec3(.7,.85,1.)
+#define SUN_COLOR vec3(1.,.8,.5)
+#define TUBE_COLOR vec3(1.,.6,.25)*1.2
+#define CAR_COLOR vec3(.4,.7,1.)
+#define TURBINES_COLOR vec3(.6,.75,1.)
+#define HUD_COLOR vec3(0.6,1.,0.3)
+#define PLANET_COLOR vec3(101., 153., 189.)/256.
+	
+#define CAR_SCALE 2.
+#define SPECULAR 0.4
+#define DIFFUSE  2.0
+#define AMBIENT  0.4
 
-// License: Unknown, author: Unknown, found: don't remember
-vec3 alphaBlend(vec3 back, vec4 front) {
-  return mix(back, front.xyz, front.w);
-}
+#define BRIGHTNESS .9
+#define GAMMA 1.1
+#define SATURATION .85
 
-// License: Unknown, author: Unknown, found: don't remember
-float tanh_approx(float x) {
-  //  Found this somewhere on the interwebs
-  //  return tanh(x);
-  float x2 = x*x;
-  return clamp(x*(27.0 + x2)/(27.0+9.0*x2), -1.0, 1.0);
-}
 
-// License: Unknown, author: Unknown, found: don't remember
-float hash(float co) {
-  return fract(sin(co*12.9898) * 13758.5453);
-}
+#define DETAIL .004
+#define SPEED 8.
+#define t (mod(iTime,500.)+10.)*SPEED
 
-// License: Unknown, author: Unknown, found: don't remember
-float hash(vec2 p) {
-  float a = dot (p, vec2 (127.1, 311.7));
-  return fract(sin(a)*43758.5453123);
-}
+#define LIGHTDIR normalize(vec3(0.6,-0.2,-1.))
 
-// Value noise: https://iquilezles.org/articles/morenoise
-float vnoise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
+// ------------------------------------------------------------------
+//    Global Variables
+// ------------------------------------------------------------------
 
-  vec2 u = f*f*(3.0-2.0*f);
-//  vec2 u = f;
+float FOLD=2.; // controls fractal fold and track width
+const vec3 planetpos=vec3(-3.5,1.,-5.); // planet position
+const vec2 tubepos=vec2(0.35,0.); // light tubes pos relative to FOLD
+mat2 trmx=mat2(0.);//the turbine spinner
+float det=0.; // detail level (varies with distance)
+float backcam=0.; // back cam flag
+vec3 carpos=vec3(0.); // car position
+vec3 carvec=vec3(0.); // car pointing vector
+mat3 carrot=mat3(0.); // car rotation
+float hitcar=0.; // ray-car hit flag
+mat2 fractrot=mat2(0.); // rot mat for fractal (set in main)
+mat2 cartilt=mat2(0.); // secondary car rotation
+float minT=0., minL=0.; // min distance traps for glows of tube and turbines
+float ref=0.; // reflection flag
+float tubeinterval=0.; // tube tiling (for glow and lighting)
 
-  float a = hash(i + vec2(0.0,0.0));
-  float b = hash(i + vec2(1.0,0.0));
-  float c = hash(i + vec2(0.0,1.0));
-  float d = hash(i + vec2(1.0,1.0));
 
-  float m0 = mix(a, b, u.x);
-  float m1 = mix(c, d, u.x);
-  float m2 = mix(m0, m1, u.y);
+// ------------------------------------------------------------------
+//    General functions 
+// ------------------------------------------------------------------
 
-  return m2;
-}
-
-// License: MIT, author: Inigo Quilez, found: https://iquilezles.org/www/articles/spherefunctions/spherefunctions.htm
-vec2 raySphere(vec3 ro, vec3 rd, vec4 sph) {
-  vec3 oc = ro - sph.xyz;
-  float b = dot( oc, rd );
-  float c = dot( oc, oc ) - sph.w*sph.w;
-  float h = b*b - c;
-  if( h<0.0 ) return vec2(-1.0);
-  h = sqrt( h );
-  return vec2(-b - h, -b + h);
+mat2 rot(float a) {
+	return mat2(cos(a),sin(a),-sin(a),cos(a));	
 }
 
-// License: MIT OR CC-BY-NC-4.0, author: mercury, found: https://mercury.sexy/hg_sdf/
-float mod1(inout float p, float size) {
-  float halfsize = size*0.5;
-  float c = floor((p + halfsize)/size);
-  p = mod(p + halfsize, size) - halfsize;
-  return c;
+mat3 lookat(vec3 fw,vec3 up){
+	fw=normalize(fw);vec3 rt=normalize(cross(fw,normalize(up)));return mat3(rt,cross(rt,fw),fw);
 }
 
-// License: MIT OR CC-BY-NC-4.0, author: mercury, found: https://mercury.sexy/hg_sdf/
-vec2 mod2(inout vec2 p, vec2 size) {
-  vec2 c = floor((p + size*0.5)/size);
-  p = mod(p + size*0.5,size) - size*0.5;
-  return c;
+float smin(float a,float b,float k){return -log(exp(-k*a)+exp(-k*b))/k;}//from iq
+
+float Sphere(vec3 p, vec3 rd, float r){
+	float b = dot( -p, rd );
+	float inner = b * b - dot( p, p ) + r * r;
+	if( inner < 0.0 ) return -1.0;
+	return b - sqrt( abs(inner) );
 }
 
-// License: Unknown, author: Unknown, found: don't remember
-vec2 hash2(vec2 p) {
-  p = vec2(dot (p, vec2 (127.1, 311.7)), dot (p, vec2 (269.5, 183.3)));
-  return fract(sin(p)*43758.5453123);
+
+// ------------------------------------------------------------------
+//    Track 
+// ------------------------------------------------------------------
+
+// the track function, just some curves
+vec3 path(float ti) { 
+	float freq=.5, amp=1.; // for trying different settings
+	ti*=freq;
+	float x=cos(cos(ti*.35682)+ti*.2823)*cos(ti*.1322)*1.5;
+	float y=sin(ti*.166453)*4.+cos(cos(ti*.125465)+ti*.17354)*cos(ti*.05123)*2.;
+	vec3  p=vec3(x,y,ti/freq);
+	return p;
 }
 
-float hifbm(vec2 p) {
-  const float aa = 0.5;
-  const float pp = 2.0-0.;
-
-  float sum = 0.0;
-  float a   = 1.0;
-
-  for (int i = 0; i < 5; ++i) {
-    sum += a*vnoise(p);
-    a *= aa;
-    p *= pp;
-  }
-
-  return sum;
+// see if we are in the tunnel, and used also by distance function
+float tunnel(float z) {
+return abs(100.-mod(z+15.,200.))-30.;
 }
 
-float lofbm(vec2 p) {
-  const float aa = 0.5;
-  const float pp = 2.0-0.;
 
-  float sum = 0.0;
-  float a   = 1.0;
+// ------------------------------------------------------------------
+//    DE functions
+// ------------------------------------------------------------------
 
-  for (int i = 0; i < 2; ++i) {
-    sum += a*vnoise(p);
-    a *= aa;
-    p *= pp;
-  }
 
-  return sum;
+// carcarspacecar by eiffie // (with some mods by Kali)
+// a reconfig of the carcar's tires (someday I will have to do an animation from the original to this)
+//the DE looks a bit long but there are actually fewer instructions than the car
+
+float carcarDE(in vec3 p0){
+	p0.xy*=cartilt;
+	p0*=CAR_SCALE;
+	vec3 p=p0;
+	p.y+=1.24;
+	float r=length(p.yz);
+	float d=length(max(vec3(abs(p.x)-0.35,r-1.92,-p.y+1.4),0.0))-0.05;
+	d=max(d,p.z-1.05);
+	p=p0+vec3(0.0,-0.22,0.39);
+	p.xz=abs(p.xz);
+	p.xyz-=vec3(0.72,0.0,1.06);
+	float w1=0.23,w2=0.24;
+	if(p0.z<0.0){//this is discontinuous yet works unless you stand in front of the rear turbines
+		w1=0.23,w2=0.05; //where you would get sucked into the blades anyways
+		p=p.xzy; //so i'm comfortable with it :)
+	} 
+	r=length(p.xy);
+	d=smin(d,length(vec2(max(abs(p.z)-w2,0.0),r-w1))-0.02,8.0);//done with the car shape, the rest is just turbines and could be replaced with lights or something
+	d=min(d,(length(p*vec3(1.,1.,.6))-.08-p0.z*.03));
+	p.xy=trmx*p.xy;//spin
+	float d2=min(abs(p.x),abs(p.y))*.15;//4 blades
+	//p.xy=mat2(0.707,-0.707,0.707,0.707)*p.xy;//45 degree turn
+	//d2=min(d2,min(abs(p.x),abs(p.y))*.2);//8 blades
+	d2=max(r-w1-.05,max(d2-0.005,abs(p.z)-w2+0.04));
+	d2=min(d2,(length(p)-.05-p0.z*.035)*.07);
+	d2=min(d2,max(d+.02,max(abs(p0.y-.07),abs(p0.x)-.4+min(0.,p0.z)))*.18);
+	minL=min(minL,d2);//catch the minimum distance to the glowing parts
+	// I used d2 only for glows (Kali)
+	return d/CAR_SCALE;// *carScale
 }
 
-float hiheight(vec2 p) {
-  return hifbm(p)-1.8;
+
+vec3 carcarCE(in vec3 p0){//coloring
+	p0*=CAR_SCALE;
+	vec4 trpc=vec4(0.);//color trap (taking samples when finding the norm)// not for now (Kali)
+
+	//right here you should inv-transform p0 as it gets used later
+	//p0=(p0-carPos)*carRot/carScale;//or something like that??
+	p0.xy*=cartilt;
+	vec3 p=p0;
+	p.y+=1.24;
+	float r=length(p.yz);
+	float d=length(max(vec3(abs(p.x)-0.35,r-1.92,-p.y+1.4),0.0))-0.05;
+	d=max(d,p.z-1.0);
+	p=p0+vec3(0.0,-0.22,0.39);
+	p.xz=abs(p.xz);
+	p.xyz-=vec3(0.72,0.0,1.06);
+	float w1=0.2,w2=0.24;
+	if(p0.z<0.0){//this is discontinuous yet works unless you stand in front of the rear turbines
+		w1=0.23,w2=0.05; //where you would get sucked into the blades anyways
+		p=p.xzy; //so i'm comfortable with it :)
+	}
+	r=length(p.xy);
+	d=smin(d,length(vec2(max(abs(p.z)-w2,0.0),r-w1))-0.02,8.0);//done with the car shape, the rest is just turbines and could be replaced with lights or something
+	p.xy=trmx*p.xy;
+	float d2=min(abs(p.x),abs(p.y));//4 blades
+	p.xy=mat2(0.707,-0.707,0.707,0.707)*p.xy;//45 degrees
+	d2=min(d2,min(abs(p.x),abs(p.y)));//8 blades
+	d2=max(r-w1+0.02,max(d2-0.005,abs(p.z)-w2+0.04));
+	//up to here it is the same as DE, now accumulate colors
+	if(d2<d){d=d2;trpc+=vec4(1.,0.6,0.3,256.0);}//turbines
+	else {//the car's body
+		p0.x=abs(p0.x);
+		if((abs(p0.y-0.58)>0.05-p0.z*0.09 || p0.z>0.25) && 
+		   length(max(abs(p0.xz+vec2(-p0.z*.03,-0.5))-vec2(0.15+p0.z*.03,0.4),0.0))>0.1)
+			trpc+=vec4(CAR_COLOR,16.0);
+		else trpc+=vec4(CAR_COLOR*.4,2.0);//the windsheild
+	}
+	return trpc.xyz; // *carScale
 }
 
-float loheight(vec2 p) {
-  return lofbm(p)-2.15;
+//-------------------------------------------
+
+// DE for tubes
+float tubes(vec3 pos) {
+	pos.x=abs(pos.x)-tubepos.x-FOLD;
+	pos.y+=tubepos.y;
+	return (length(pos.xy)-.05);
 }
 
-vec4 plane(vec3 ro, vec3 rd, vec3 pp, vec3 npp, vec3 off, float n) {
-  float h = hash(n);
-  float s = mix(0.05, 0.25, h);
+// ------------------------------------------------------------------
+//    SCENE DE
+// ------------------------------------------------------------------
 
-  vec3 hn;
-  vec2 p = (pp-off*2.0*vec3(1.0, 1.0, 0.0)).xy;
-
-  const vec2 stp = vec2(0.5, 0.33);
-  float he    = hiheight(vec2(p.x, pp.z)*stp);
-  float lohe  = loheight(vec2(p.x, pp.z)*stp);
-
-  float d = p.y-he;
-  float lod = p.y - lohe;
-
-  float aa = distance(pp, npp)*sqrt(1.0/3.0);
-  float t = smoothstep(aa, -aa, d);
-
-  float df = exp(-0.1*(distance(ro, pp)-2.));
-  vec3 acol = hsv2rgb(vec3(mix(0.9, 0.6, df), 0.9, mix(1.0, 0.0, df)));
-  vec3 gcol = hsv2rgb(vec3(0.6, 0.5, tanh_approx(exp(-mix(2.0, 8.0, df)*lod))));
-
-  vec3 col = vec3(0.0);
-  col += acol;
-  col += 0.5*gcol;
-
-  return vec4(col, t);
+float de(vec3 pos) {
+	vec3 carp=pos-carpos; // scale car coordinates
+	carp=carrot*carp; // rotate car
+	pos.xy-=path(pos.z).xy; // transform coordinates to follow track
+	FOLD=1.7+pow(abs(100.-mod(pos.z,200.))/100.,2.)*2.; //varies fractal fold & track width
+	pos.x-=FOLD;
+	float hid=0.;
+	vec3 tpos=pos;
+	tpos.z=abs(2.-mod(tpos.z,4.));
+	vec4 p=vec4(tpos,1.);
+	for (int i=0; i<ITERATIONS; i++) { // calculate fractal
+		p.xz=clamp(p.xz,-vec2(FOLD,2.),vec2(FOLD,2.))*2.0-p.xz;
+		p=p*2.5/clamp(dot(p.xyz,p.xyz),.5,1.)-vec4(1.2,0.5,0.,-0.5);
+		p.xy*=fractrot;
+	}
+	pos.x+=FOLD;
+	float fr=min(max(pos.y+.4,abs(pos.x)-.15*FOLD),(max(p.x,p.y)-1.)/p.w); // fractal+pit
+	float tub=tubes(pos);  
+	minT=min(minT,tub*.5); // trap min distance to tubes	
+	float car=carcarDE(carp); 
+	float d=tub;
+	d=min(fr,d);
+	d=min(d,max(abs(pos.y-1.35+cos(3.1416+pos.x*.8)*.5)-.1,tunnel(pos.z))); // tunnel DE
+	if (ref<1.) d=min(d,car);
+	d=max(d,abs(pos.x)-FOLD*2.);
+	if (car<det) hitcar=1.; // ray hits the car!
+	return d;
 }
 
-vec3 stars(vec2 sp, float hh) {
-  const vec3 scol0 = HSV2RGB(vec3(0.85, 0.8, 1.0));
-  const vec3 scol1 = HSV2RGB(vec3(0.65, 0.5, 1.0));
-  vec3 col = vec3(0.0);
 
-  const float m = 6.0;
+// ------------------------------------------------------------------
+//    General Shading Functions
+// ------------------------------------------------------------------
 
-  for (float i = 0.0; i < m; ++i) {
-    vec2 pp = sp+0.5*i;
-    float s = i/(m-1.0);
-    vec2 dim  = vec2(mix(0.05, 0.003, s)*PI);
-    vec2 np = mod2(pp, dim);
-    vec2 h = hash2(np+127.0+i);
-    vec2 o = -1.0+2.0*h;
-    float y = sin(sp.x);
-    pp += o*dim*0.5;
-    pp.y *= y;
-    float l = length(pp);
 
-    float h1 = fract(h.x*1667.0);
-    float h2 = fract(h.x*1887.0);
-    float h3 = fract(h.x*2997.0);
-
-    vec3 scol = mix(8.0*h2, 0.25*h2*h2, s)*mix(scol0, scol1, h1*h1);
-
-    vec3 ccol = col + exp(-(mix(6000.0, 2000.0, hh)/mix(2.0, 0.25, s))*max(l-0.001, 0.0))*scol;
-    ccol *= mix(0.125, 1.0, smoothstep(1.0, 0.99, sin(0.25*TIME+TAU*h.y)));
-    col = h3 < y ? ccol : col;
-  }
-
-  return col;
+vec3 normal(vec3 p) {
+	vec3 e = vec3(0.0,det,0.0);
+	
+	return normalize(vec3(
+			de(p+e.yxx)-de(p-e.yxx),
+			de(p+e.xyx)-de(p-e.xyx),
+			de(p+e.xxy)-de(p-e.xxy)
+			)
+		);	
 }
 
-vec3 toSpherical(vec3 p) {
-  float r   = length(p);
-  float t   = acos(p.z/r);
-  float ph  = atan(p.y, p.x);
-  return vec3(r, t, ph);
+#ifndef LOW_QUALITY 
+
+float shadow(vec3 pos, vec3 sdir) {
+	float sh=1.0;
+	float totdist = DETAIL*10.;
+	float dist=1000.;
+		for (int steps=0; steps<SHADOW_STEPS; steps++) {
+			if (totdist<MAX_DIST && dist>DETAIL) {
+				vec3 p = pos - totdist * sdir;
+				dist = de(p);
+				sh = min(sh, 10.*max(0.0,dist)/totdist);
+				sh*= sign(max(0.,dist-DETAIL));
+				totdist += max(0.02,dist);
+			}
+#ifdef LOOP_BREAKS		
+		else break;
+#endif
+		}
+	
+	return clamp(sh,0.,1.0);
 }
-
-const vec3 lpos   = 1E6*vec3(0., -0.15, 1.0);
-const vec3 ldir   = normalize(lpos);
-
-vec4 moon(vec3 ro, vec3 rd) {
-  const vec4 mdim   = vec4(1E5*vec3(0., 0.4, 1.0), 20000.0);
-  const vec3 mcol0  = HSV2RGB(vec3(0.75, 0.7, 1.0));
-  const vec3 mcol3  = HSV2RGB(vec3(0.75, 0.55, 1.0));
-
-  vec2 md     = raySphere(ro, rd, mdim);
-  vec3 mpos   = ro + rd*md.x;
-  vec3 mnor   = normalize(mpos-mdim.xyz);
-  float mdif  = max(dot(ldir, mnor), 0.0);
-  float mf    = smoothstep(0.0, 10000.0, md.y - md.x);
-  float mfre  = 1.0+dot(rd, mnor);
-  float imfre = 1.0-mfre;
-
-  vec3 col = vec3(0.0);
-  col += mdif*mcol0*4.0;
-
-#if defined(SHOW_FFT)
-  vec3 fcol = vec3(0.0);
-  vec2 msp    = toSpherical(-mnor.zxy).yz;
-  vec2 omsp   = msp;
-  float msf   = sin(msp.x);
-  msp.x       -= PI*0.5;
-  const float mszy = (TAU/(4.0))*0.125;
-  float msny  = mod1(msp.y, mszy);
-  msp.y *= msf;
-
-  const int limit = 1;
-  for (int i = -limit; i <= limit; ++i) {
-    vec2 pp     = msp+vec2(0.0, mszy*float(i));
-    float d0    = abs(pp.y);
-    vec2 cp     = vec2(0.055*abs(msny-float(i)), 0.25);
-    float fft   = texture(iChannel0, cp).x;
-    float d1    = length(pp)-0.05*fft;
-    float h     =mix(0.66, 0.99, fft);
-    vec3 mcol1  = hsv2rgb(vec3(h, 0.55, 1.0));
-    vec3 mcol2  = hsv2rgb(vec3(h, 0.85, 1.0));
-    fcol += mcol1*0.5*tanh_approx(0.0025/max(d0, 0.0))*imfre*pow(msf, mix(100.0, 10.0, fft));
-    fcol += mcol2*5.0*tanh_approx(0.00025/(max(d1, 0.0)*max(d1, 0.0)))*imfre*msf;
-  }
-  float d0   = abs(msp.x);
-  fcol += mcol3*0.5*tanh_approx(0.0025/max(d0, 0.0))*imfre;
-
-  const float start = 18.0;
-  col += fcol*smoothstep(start, start+6.0+2.0*abs(omsp.y), TIME);
 
 #endif
 
-  return vec4(col, mf);
+float calcAO(vec3 pos, vec3 nor) {
+	float hr,dd,aoi=0.,sca=1.,totao=0.;
+	hr = .075*aoi*aoi;dd = de(nor * hr + pos);totao += (hr-dd)*sca;sca*=.6;aoi++;
+	hr = .075*aoi*aoi;dd = de(nor * hr + pos);totao += (hr-dd)*sca;sca*=.55;aoi++;
+	hr = .075*aoi*aoi;dd = de(nor * hr + pos);totao += (hr-dd)*sca;sca*=.55;aoi++;
+	hr = .075*aoi*aoi;dd = de(nor * hr + pos);totao += (hr-dd)*sca;sca*=.55;aoi++;
+	return clamp( 1.0 - 4.*totao, 0., 1.0 );
 }
 
 
-vec3 skyColor(vec3 ro, vec3 rd) {
-  const vec3 acol   = HSV2RGB(vec3(0.6, 0.9, 0.075));
-  const vec3 lpos   = 1E6*vec3(0., -0.15, 1.0);
-  const vec3 lcol   = HSV2RGB(vec3(0.75, 0.8, 1.0));
-
-  vec2 sp     = toSpherical(rd.xzy).yz;
-
-  float lf    = pow(max(dot(ldir, rd), 0.0), 80.0);
-  float li    = 0.02*mix(1.0, 10.0, lf)/(abs((rd.y+0.055))+0.025);
-  float lz    = step(-0.055, rd.y);
-
-  vec4 mcol   = moon(ro, rd);
-
-  vec3 col = vec3(0.0);
-  col += stars(sp, 0.25)*smoothstep(0.5, 0.0, li)*lz;
-  col  = mix(col, mcol.xyz, mcol.w);
-  col += smoothstep(-0.4, 0.0, (sp.x-PI*0.5))*acol;
-  col += tanh(lcol*li);
-  return col;
-}
-
-vec3 color(vec3 ww, vec3 uu, vec3 vv, vec3 ro, vec2 p) {
-  float lp = length(p);
-  vec2 np = p + 2.0/RESOLUTION.y;
-  float rdd = 2.0;
-  vec3 rd = normalize(p.x*uu + p.y*vv + rdd*ww);
-  vec3 nrd = normalize(np.x*uu + np.y*vv + rdd*ww);
-
-  const float planeDist = 1.0;
-  const int furthest = 12;
-  const int fadeFrom = 10;
-
-  const float fadeDist = planeDist*float(fadeFrom);
-  const float maxDist  = planeDist*float(furthest);
-  float nz = floor(ro.z / planeDist);
-
-  vec3 skyCol = skyColor(ro, rd);
+// ------------------------------------------------------------------
+//    Light and Coloring
+// ------------------------------------------------------------------
 
 
-  vec4 acol = vec4(0.0);
-  const float cutOff = 0.95;
-  bool cutOut = false;
 
-  // Steps from nearest to furthest plane and accumulates the color
-  for (int i = 1; i <= furthest; ++i) {
-    float pz = planeDist*nz + planeDist*float(i);
+vec3 shade(in vec3 p, in vec3 dir, in vec3 n) {
 
-    float pd = (pz - ro.z)/rd.z;
+	float savehitcar=hitcar;
 
-    vec3 pp = ro + rd*pd;
+	vec3 trackoffset=-vec3(path(p.z).xy,0.);
+	vec3 pos=p;
+	vec3 col=vec3(.5); // main color
+	vec3 carp=pos-carpos; //scaled coordinates for the car
+	carp=carrot*carp; // rotate car
+	pos+=trackoffset; // apply track transformation to the coordinates
+	// track lines
+	if (pos.y<.5) col+=pow(max(0.,.2-abs(pos.x))/.2*abs(sin(pos.z*2.)),8.)*TUBE_COLOR*2.;
+	pos.x=abs(pos.x);
+	// fake AO for the tunnel's upper corners
+	if(tunnel(pos.z)<0.)
+		col*=1.-pow(max(0.5,1.-length(pos.xy+vec2(-FOLD*1.5,-.85))),5.)*max(0.,1.+pos.y);
+	if (tubes(pos)<det) col=TUBE_COLOR; // hit tubes
+	if (carcarDE(carp)<det) col=carcarCE(carp); // hit car, get coloring
 
-    if (pp.y < 0. && pd > 0.0 && acol.w < cutOff) {
-      vec3 npp = ro + nrd*pd;
+	float ao=calcAO(p,n); // calc AO
+	float camlight=max(0.,dot(dir,-n)); // camlight used for ambient
 
-      vec3 off = vec3(0.0);
+	// --- Tube lights ---
 
-      vec4 pcol = plane(ro, rd, pp, npp, off, nz+float(i));
-
-      float nz = pp.z-ro.z;
-      float fadeIn = smoothstep(maxDist, fadeDist, pd);
-      pcol.xyz = mix(skyCol, pcol.xyz, fadeIn);
-      pcol = clamp(pcol, 0.0, 1.0);
-
-      acol = alphaBlend(pcol, acol);
-    } else {
-      cutOut = true;
-      acol.w = acol.w > cutOff ? 1.0 : acol.w;
-      break;
-    }
-
-  }
-
-  vec3 col = alphaBlend(skyCol, acol);
-  return col;
-}
-
-vec3 effect(vec2 p, vec2 q) {
-  float tm= TIME*1.05;
-  vec3 ro = vec3(0.0, 0.0, tm);
-  vec3 dro= normalize(vec3(0.0, 0.09, 1.0));
-  vec3 ww = normalize(dro);
-  vec3 uu = normalize(cross(normalize(vec3(0.0,1.0,0.0)), ww));
-  vec3 vv = normalize(cross(ww, uu));
-
-  vec3 col = color(ww, uu, vv, ro, p);
-
-  return col;
-}
-
-// License: Unknown, author: nmz (twitter: @stormoid), found: https://www.shadertoy.com/view/NdfyRM
-float sRGB(float t) { return mix(1.055*pow(t, 1./2.4) - 0.055, 12.92*t, step(t, 0.0031308)); }
-// License: Unknown, author: nmz (twitter: @stormoid), found: https://www.shadertoy.com/view/NdfyRM
-vec3 sRGB(in vec3 c) { return vec3 (sRGB(c.x), sRGB(c.y), sRGB(c.z)); }
-
-// License: Unknown, author: Matt Taylor (https://github.com/64), found: https://64.github.io/tonemapping/
-vec3 aces_approx(vec3 v) {
-  v = max(v, 0.0);
-  v *= 0.6;
-  float a = 2.51;
-  float b = 0.03;
-  float c = 2.43;
-  float d = 0.59;
-  float e = 0.14;
-  return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0, 1.0);
-}
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-  vec2 q = fragCoord/RESOLUTION.xy;
-  vec2 p = -1. + 2. * q;
-  p.x *= RESOLUTION.x/RESOLUTION.y;
-  vec3 col = vec3(0.0);
-  col = effect(p, q);
-  // col *= smoothstep(0.0, 8.0, TIME-abs(q.y));
-  col = aces_approx(col);
-  col = sRGB(col);
-  fragColor = vec4(col, 1.0);
-}
-
-// --------------------------------- //
-// --------[ Text Drawing]---------- //
-// --------------------------------- //
-
-vec2 uv;
-const vec2 ch_size  = vec2(1.0, 2.0) * 0.6;              // character size (Y,X)
-const vec2 ch_space = ch_size + vec2(1.0, 1.0);    // character distance Vector(X,Y)
-const vec2 ch_start = vec2 (ch_space.x * -1.75, 3.25); // start position
-      vec2 ch_pos   = vec2 (0.0, 0.0);             // character position(X,Y)
-#define REPEAT_SIGN false // True/False; True=Multiple, False=Single
-
-#define n0 ddigit(0x22FF);
-#define n1 ddigit(0x0281);
-#define n2 ddigit(0x1177);
-#define n3 ddigit(0x11E7);
-#define n4 ddigit(0x5508);
-#define n5 ddigit(0x11EE);
-#define n6 ddigit(0x11FE);
-#define n7 ddigit(0x2206);
-#define n8 ddigit(0x11FF);
-#define n9 ddigit(0x11EF);
-
-#define A ddigit(0x119F);
-#define B ddigit(0x927E);
-#define C ddigit(0x007E);
-#define D ddigit(0x44E7);
-#define E ddigit(0x107E);
-#define F ddigit(0x101E);
-#define G ddigit(0x807E);
-#define H ddigit(0x1199);
-#define I ddigit(0x4466);
-#define J ddigit(0x4436);
-#define K ddigit(0x9218);
-#define L ddigit(0x0078);
-#define M ddigit(0x0A99);
-#define N ddigit(0x8899);
-#define O ddigit(0x00FF);
-#define P ddigit(0x111F);
-#define Q ddigit(0x80FF);
-#define R ddigit(0x911F);
-#define S ddigit(0x8866);
-#define T ddigit(0x4406);
-#define U ddigit(0x00F9);
-#define V ddigit(0x2218);
-#define W ddigit(0xA099);
-#define X ddigit(0xAA00);
-#define Y ddigit(0x4A00);
-#define Z ddigit(0x2266);
-#define _ ch_pos.x += ch_space.x;
-#define s_dot     ddigit(0);
-#define s_minus   ddigit(0x1100);
-#define s_plus    ddigit(0x5500);
-#define s_greater ddigit(0x2800);
-#define s_less    ddigit(0x8200);
-#define s_sqrt    ddigit(0x0C02);
-#define nl1 ch_pos = ch_start;  ch_pos.y -= 3.0;
-#define nl2 ch_pos = ch_start;  ch_pos.y -= 6.0;
-#define nl3 ch_pos = ch_start;	ch_pos.y -= 9.0;
-#define nl4 ch_pos = ch_start;	ch_pos.y -= 12.0;
-
-float dseg(vec2 p0, vec2 p1)
-{
-	vec2 dir = normalize(p1 - p0);
-	vec2 cp = (uv - ch_pos - p0) * mat2(dir.x, dir.y,-dir.y, dir.x);
-	return distance(cp, clamp(cp, vec2(0), vec2(distance(p0, p1), 0)));   
-}
-
-bool bit(int n, int b)
-{
-	return mod(floor(float(n) / exp2(floor(float(b)))), 2.0) != 0.0;
-}
-
-float d = 1e6;
-
-void ddigit(int n)
-{
-	float v = 1e6;	
-	vec2 cp = uv - ch_pos;
-	if (n == 0)     v = min(v, dseg(vec2(-0.405, -1.000), vec2(-0.500, -1.000)));
-	if (bit(n,  0)) v = min(v, dseg(vec2( 0.500,  0.063), vec2( 0.500,  0.937)));
-	if (bit(n,  1)) v = min(v, dseg(vec2( 0.438,  1.000), vec2( 0.063,  1.000)));
-	if (bit(n,  2)) v = min(v, dseg(vec2(-0.063,  1.000), vec2(-0.438,  1.000)));
-	if (bit(n,  3)) v = min(v, dseg(vec2(-0.500,  0.937), vec2(-0.500,  0.062)));
-	if (bit(n,  4)) v = min(v, dseg(vec2(-0.500, -0.063), vec2(-0.500, -0.938)));
-	if (bit(n,  5)) v = min(v, dseg(vec2(-0.438, -1.000), vec2(-0.063, -1.000)));
-	if (bit(n,  6)) v = min(v, dseg(vec2( 0.063, -1.000), vec2( 0.438, -1.000)));
-	if (bit(n,  7)) v = min(v, dseg(vec2( 0.500, -0.938), vec2( 0.500, -0.063)));
-	if (bit(n,  8)) v = min(v, dseg(vec2( 0.063,  0.000), vec2( 0.438, -0.000)));
-	if (bit(n,  9)) v = min(v, dseg(vec2( 0.063,  0.063), vec2( 0.438,  0.938)));
-	if (bit(n, 10)) v = min(v, dseg(vec2( 0.000,  0.063), vec2( 0.000,  0.937)));
-	if (bit(n, 11)) v = min(v, dseg(vec2(-0.063,  0.063), vec2(-0.438,  0.938)));
-	if (bit(n, 12)) v = min(v, dseg(vec2(-0.438,  0.000), vec2(-0.063, -0.000)));
-	if (bit(n, 13)) v = min(v, dseg(vec2(-0.063, -0.063), vec2(-0.438, -0.938)));
-	if (bit(n, 14)) v = min(v, dseg(vec2( 0.000, -0.938), vec2( 0.000, -0.063)));
-	if (bit(n, 15)) v = min(v, dseg(vec2( 0.063, -0.063), vec2( 0.438, -0.938)));
-	ch_pos.x += ch_space.x;
-	d = min(d, v);
-}
-
-vec3 hsv2rgb_smooth( in vec3 c )
-{
-    vec3 rgb = clamp( abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0 );
-
-	rgb = rgb*rgb*(3.0-2.0*rgb); // cubic smoothing	
-
-	return c.z * mix( vec3(1.0), rgb, c.y);
-}
-
-void mainText( out vec4 fragColor, in vec2 fragCoord ) 
-{
+	vec3 tpos1=vec3((tubepos+vec2(FOLD,0.)),0.)+trackoffset; // get tube positions
+	vec3 tpos2=tpos1-vec3((tubepos.x+FOLD)*2.,0.,0.);
+	// light direction
+	vec3 tube1lightdir=normalize(vec3(p.xy,0.)+vec3(tpos1.xy,0.)); 
+	vec3 tube2lightdir=normalize(vec3(p.xy,0.)+vec3(tpos2.xy,0.));
+	// light falloffs
+	float falloff1,falloff2;	
+	if (savehitcar>0.) {
+		falloff1=pow(max(0.,1.-.15*distance(vec3(p.xy,0.),vec3(-tpos1.xy,0.))),4.);
+		falloff2=pow(max(0.,1.-.15*distance(vec3(p.xy,0.),vec3(-tpos2.xy,0.))),4.);
+	} else {
+		falloff1=pow(max(0.,1.-.2*distance(vec3(p.xy,0.),vec3(-tpos1.xy,0.))),4.);
+		falloff2=pow(max(0.,1.-.2*distance(vec3(p.xy,0.),vec3(-tpos2.xy,0.))),4.);
+	}
 	
-	vec2 aspect = (resolution.xy / resolution.y) + 0.2;
-	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
-	float _d =  1.0-length(uv);
-	uv *= 18.0 ;
-	uv -= vec2(-7., 1.);
-
-	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.5,0.5));
-	uv.x += 0.7+sin(iTime+uv.y*0.7)*0.5;
-	ch_pos = ch_start;
+	float diff, spec;
 	
+	vec3 r=reflect(LIGHTDIR,n);
 	
-nl1
-nl2
-_ _ L I G H T A M P nl3
+	// tube1 calcs
+	diff=max(0.,dot(tube1lightdir,-n)); 
+	diff+=max(0.,dot(normalize(tube1lightdir+vec3(0.,0.,.2)),-n))*.5; // add 2 more 
+	diff+=max(0.,dot(normalize(tube1lightdir-vec3(0.,0.,.2)),-n))*.5; // with Z shifted
+	spec=pow(max(0.,dot(tube1lightdir+vec3(0.,0.,.4),r)),15.)*.7;
+	spec+=pow(max(0.,dot(tube1lightdir-vec3(0.,0.,.4),r)),15.)*.7;
+	float tl1=(falloff1*ao+diff+spec)*falloff1;
+
+	// tube2 calcs
+	diff=max(0.,dot(tube2lightdir,-n));
+	diff+=max(0.,dot(normalize(tube2lightdir+vec3(0.,0.,.2)),-n))*.5;
+	diff+=max(0.,dot(normalize(tube2lightdir-vec3(0.,0.,.2)),-n))*.5;
+	spec=pow(max(0.,dot(tube2lightdir+vec3(0.,0.,.4),r)),15.)*.7;
+	spec+=pow(max(0.,dot(tube2lightdir-vec3(0.,0.,.4),r)),15.)*.7;
+	float tl2=(falloff2*ao+diff+spec)*falloff2;
+
+	// sum tube lights - add ambient - apply tube intervall
+	vec3 tl=((tl1+tl2)*(.5+tubeinterval*.5))*TUBE_COLOR;//*(1.+tun*.5);
 
 
-	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*2.0));  // shading
-	fragColor = vec4(color, 1.0);
+	// --- Car lights ---
+
+	// get the car turbines direction (aproximate)
+	vec3 carlightdir1=normalize(p-carpos+vec3(.2,0.06,.15));
+	vec3 carlightdir2=normalize(p-carpos+vec3(-.2,0.06,.15));
+	vec3 carlightdir3=normalize(p-carpos+vec3(.2,0.06,-.35));
+	vec3 carlightdir4=normalize(p-carpos+vec3(-.2,0.06,-.35));
+
+	float cfalloff=pow(max(0.,1.-.1*distance(p,carpos)),13.); // car light falloff
+
+	// accumulate diffuse
+	diff=max(0.,dot(carlightdir1,-n))*.5;
+	diff+=max(0.,dot(carlightdir2,-n))*.5;
+	diff+=max(0.,dot(carlightdir3,-n))*.5;
+	diff+=max(0.,dot(carlightdir4,-n))*.5;
+
+	if (savehitcar<1.) diff*=clamp(1.-carlightdir1.y,0.,1.);
+	
+	// add ambient and save car lighting
+	vec3 cl=TURBINES_COLOR*((diff+spec*.0)*cfalloff+cfalloff*.3)*1.2;
+ 	
+	// --- Main light ---
+	
+#ifdef LOW_QUALITY
+	float sh=ao;
+#else
+	float sh=shadow(p, LIGHTDIR); // get shadow
+#endif
+
+	diff=max(0.,dot(LIGHTDIR,-n))*sh*1.3; // diffuse
+	float amb=(.4+.6*camlight)*.6; // ambient+camlight
+	spec=pow(max(0.,dot(dir,-r))*sh,20.)*SPECULAR; //specular
+	if (savehitcar>0.) {diff*=.8;amb*=.3;}
+	vec3 l=(amb*ao*AMBIENT_COLOR+diff*LIGHT_COLOR)+spec*LIGHT_COLOR;	
+
+	if (col==TUBE_COLOR) l=.3+vec3(camlight)*.7; // special lighting for tubes
+
+	return col*(l+cl+tl); // apply all lights to the color
 }
 
-void secText( out vec4 fragColor, in vec2 fragCoord ) 
+// the planet shading...
+// very simple and fast made, but for low res windowed mode it does the job :)
+vec3 shadeplanet(vec3 pos, vec3 k) { 
+
+	vec3 n=normalize(planetpos+pos+.2); // tweaked sphere normal
+	float c=max(0.,dot(LIGHTDIR,normalize(k-n))); // surface value
+	vec3 col=PLANET_COLOR+vec3(c,c*c,c*c*c)*.7; // surface coloring
+	// add some noise
+	float noi=max(0.,texture(iChannel1,n.yz*.5).x-.6);
+	noi+=max(0.,texture(iChannel1,n.yz).x-.6);
+	noi+=max(0.,texture(iChannel1,n.yz*2.).x-.6);
+	col+=noi*(1.5-c)*.7;
+	return col*max(0.,dot(LIGHTDIR,-n)); // diff light
+}
+
+// ------------------------------------------------------------------
+//    Raymarching + FX rendering
+// ------------------------------------------------------------------
+
+
+vec3 raymarch(in vec3 from, in vec3 dir) 
+
 {
-	
-	vec2 aspect = (resolution.xy / resolution.y) - 1.3;
-	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
-	float _d =  1.0-length(uv);
-	uv *= 18.0 ;
-	uv -= vec2(-7., 1.);
+	hitcar=0.;
+	ref=0.;
+	float totdist=0.;
+	float glow=0.;
+	float d=1000.;
+	vec3 p=from, col=vec3(0.5);
 
-	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.5,0.5));
-	uv.x += -60.0 + (iTime*3);
-	ch_pos = ch_start;
-	
-A _ N E W _ R E L E A S E _ F O R _ U s_dot B I G _ T H A N K S _ T O _ A L L _ T H E _ P P L _ O U T _ T H E R E _ W H O _ M A D E _ T H I S _ P O S S I B L E s_dot
-Y O U _ A R E _ A W E S O M E s_dot s_dot s_dot
+	float deta=DETAIL*(1.+backcam); // lower detail for HUD cam
+	vec3 carp=vec3(0.); // coordinates for car hit
+	vec3 carn=vec3(0.); // normal for car
+	float cardist=0.; // ray length for car
+	vec3 odir=dir; // save original ray direction
 
-	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*1.0));  // shading
-	fragColor = vec4(color, 1.0);
+	for (int i=0; i<RAY_STEPS; i++) {
+		if (d>det && totdist<MAX_DIST) {
+			d=de(p);
+			p+=d*dir;
+			det=max(deta,deta*totdist*.5*(1.+ref)); // scale detail with distance or reflect
+			totdist+=d; 
+			float gldist=det*8.; // background glow distance 
+			if(d<gldist&&totdist<20.) glow+=max(0.,gldist-d)/gldist*exp(-.1*totdist); //accum glow
+#ifndef LOW_QUALITY
+			if (hitcar>0. && ref<1.) { // hit car, bounce ray (only once)
+				p=p-abs(d-det)*dir; // backstep
+				carn=normal(p); // save car normal
+				carp=p; // save car hit pos
+				dir=reflect(dir,carn); // reflect ray
+				p+=det*dir*10.; // advance ray
+				d=10.; cardist=totdist;
+				ref=1.;
+			}
+#endif
+		} 
+#ifdef LOOP_BREAKS		
+		else break;
+#endif
+	}
+
+	tubeinterval=abs(1.+cos(p.z*3.14159*.5))*.5; // set light tubes interval
+	float cglow=1./(1.0+minL*minL*5000.0); // car glow
+	float tglow=1./(1.0+minT*minT*5000.0); // tubes glow
+	float l=max(0.,dot(normalize(-dir),normalize(LIGHTDIR))); // lightdir gradient
+	vec3 backg=AMBIENT_COLOR*.4*max(0.1,pow(l,5.)); // background
+	float lglow=pow(l,50.)*.5+pow(l,200.)*.5; // sun glow
+
+	if (d<.5) { // hit surface
+		vec3 norm=normal(p); // get normal
+		p=p-abs(d-det)*dir; // backstep
+		col=shade(p, dir, norm); // get shading 
+		col+=tglow*TUBE_COLOR*pow(tubeinterval,1.5)*2.; // add tube glow
+		col = mix(backg, col, exp(-.015*pow(abs(totdist),1.5))); // distance fading
+
+	} else { // hit background
+		col=backg; // set color to background
+		col+=lglow*SUN_COLOR; // add sun glow
+		col+=glow*pow(l,5.)*.035*LIGHT_COLOR; // borders glow
+		
+#ifdef LOW_QUALITY
+		vec3 st = (dir * 3.+ vec3(1.3,2.5,1.25)) * .3;
+		for (int i = 0; i < 14; i++) st = abs(st) / dot(st,st) - .9;
+
+		col+= min( 1., pow( min( 5., length(st) ), 3. ) * .0025 ); // add stars
+#else
+		float planet=Sphere(planetpos,dir, 2.); // raytrace planet
+
+		// kaliset formula - used for stars and planet surface 
+		float c;
+		if (planet>0.) c=1.; else c=.9; // different params for planet and stars
+		vec3 st = (dir * 3.+ vec3(1.3,2.5,1.25)) * .3;
+		for (int i = 0; i < 14; i++) st = abs(st) / dot(st,st) - c;
+
+		col+= min( 1., pow( min( 5., length(st) ), 3. ) * .0025 ); // add stars
+		
+		// planet atmosphere
+		col+=PLANET_COLOR*pow(max(0.,dot(dir,normalize(-planetpos))),100.)*150.*(1.-dir.x);
+		// planet shading
+		if (planet>0.) col=shadeplanet(planet*dir,st);
+#endif
+		
+	}
+	// car shading
+
+		// add turbine glows
+	
+#ifdef LOW_QUALITY
+	cglow*=1.15;
+#else
+	if (ref>0.) {
+		ref=0.;
+		col=shade(carp,odir,carn)+col*.3; // car shade + reflection
+		// I wanted a lighter background for backward reflection
+		l=max(0.,dot(normalize(-odir),normalize(LIGHTDIR)));
+		backg=AMBIENT_COLOR*.4*max(0.1,pow(l,5.)); 
+		col = mix(backg, col,exp(-.015*pow(abs(cardist),1.5))); // distance fading
+	}
+#endif 
+
+	
+	col+=TURBINES_COLOR*pow(abs(cglow),2.)*.4;
+	col+=TURBINES_COLOR*cglow*.15;
+
+
+	return col; 
 }
+
+// simple HUD track graph with transparency
+vec4 showtrack(vec2 p) {
+	p.x+=.25;
+	vec2 uv=p;
+	float uvpos=uv.x+1.5;
+	vec3 pth=path((uvpos-1.5)*30.+t)*.05;
+	float curpos=path(t).x*.05;
+	float curs=pow(max(0.,1.-length(uv+vec2(0.,curpos))*2.),10.)*max(0.5,sin(iTime*10.))*2.;
+	uv.xy=uv.xy-(vec2(uvpos,0.))*rot(pth.x/uvpos);
+	float dotline=pow(max(0.,1.-abs(uv.y)*5.),30.);
+	float graph=(curs+dotline);
+	return vec4((graph+.4)*HUD_COLOR,1.-.5*pow(abs(.025-mod(p.y*2.,.05))/.025,2.));
+}
+
+
+// ------------------------------------------------------------------
+//    Main code - Camera - HUD 
+// ------------------------------------------------------------------
+
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+	minL=minT=1000.; // initialize min distance glows
+	fractrot=rot(.5); // mat2D for the fractal formula
+	vec3 carpos0=vec3(0.,-0.2,.0); // set relative car pos (unused now, only sets height)
+	carpos=vec3(carpos0+vec3(0.,0.,t)); // real car pos
+	vec3 carmove=path(carpos.z); carmove.x*=1.+FOLD*.1; // get pos, exagerate x pos based on track width.
+	carvec=normalize((path(carpos.z+2.)-carmove)*vec3(FOLD*.25,1.,1.)); // car fwd vector
+	carrot=lookat(-carvec,vec3(0.,1.,0.)); // car rotation
+	cartilt=rot(-carvec.x*2.); // xy rotation based on distance from center
+	carpos.xy+=carmove.xy-vec2(carvec.x,0.)*FOLD*.5; // move away from center when turning
+	float tim=iTime*12.0;
+	trmx=mat2(cos(tim),-sin(tim),sin(tim),cos(tim));//the turbine spinner
+
+	// --- camera & mouse ---
+	
+	vec2 uv = fragCoord.xy / iResolution.xy*2.-1.;
+	uv.y*=iResolution.y/iResolution.x;
+	vec2 mouse=(iMouse.xy/iResolution.xy-.5)*vec2(7.,1.5);
+	if (iMouse.z<1.) { // if no mouse, alternate rear and back cam
+		mouse=vec2(sin(iTime)*.7,2.+sin(iTime*.2)*.22)
+			*min(0.,sign(10.-mod(iTime,20.)));
+	}
+	vec3 dir=normalize(vec3(uv*.8,1.));
+
+	vec3 campos=vec3(0.,0.2,-.6); // original relative camera position
+	//rotate camera with mouse
+	campos.yz=(campos.yz-carpos0.yz)*rot(mouse.y)+carpos0.yz;
+	campos.xz=(campos.xz-carpos0.xz)*rot(mouse.x)+carpos0.xz;
+	campos.x-=carvec.x*FOLD; // follow car x pos a bit when turning
+
+	vec3 from;
+	
+	float fixcam=5.;
+	float mt=mod(t/SPEED,fixcam*2.);
+	//fixed cam every 15 seconds, random position, point at car position
+	if ((mod(iTime,20.)>15. && iMouse.z<1.)) {
+		fixcam*=SPEED;
+		from=path(floor(t/fixcam)*fixcam+fixcam*.5);
+		//from.x+=.05;// from.y+=.5;
+		vec2 fixpos=(texture(iChannel1,vec2(from.z*.21325)).xy-.5)*vec2(FOLD*2.-.3,1.);
+		fixpos.x+=sign(fixpos.x)*.3; fixpos.y+=.2;
+		from.xy+=fixpos;
+		dir=lookat(normalize(carpos-from),vec3(0.,1.,0.))*normalize(dir+vec3(0.,0.,0.5));
+
+	} else { //normal cam
+		from=path(t+campos.z)+campos;
+		dir.y-=.3*campos.z;
+		dir=lookat(normalize(carpos-from),vec3(0.,1.,0.))*normalize(dir);
+	}
+
+	vec4 hud=vec4(0.);
+	
+#ifndef NO_HUD	
+	//HUD (hud camera was going to be transparent but won't compile)
+	backcam=0.;
+		vec2 huv=uv+vec2(.75,.44);
+		if (length(huv*huv*huv*vec2(5.,50.))<.05) hud=showtrack(huv*2.); // track HUD
+		uv+=vec2(-.75,.44);
+		if (length(uv*uv*uv*vec2(5.,50.))<.05) { //set ray data for HUD cam
+				backcam=1.;
+				uv*=6.;
+				dir=normalize(vec3(uv.xy*.6,-1.));
+				from=vec3(carvec.x*.5,0.1,0.)+path(t-campos.z*1.7);
+				dir=lookat(-normalize(carpos-from),normalize(vec3(0.,1.,0.)))*dir;
+				//color+=HUD_COLOR*(vec3(HUDraymarch(from,dir))+.1);
+		}
+
+#endif	
+
+	vec3 color=raymarch(from,dir); 	// Raymarch scene
+	color=clamp(color,vec3(.0),vec3(1.));
+	if (backcam>0.) { //if HUD cam, apply post effect
+		color=(.2+pow(length(color),1.7)*.5)*HUD_COLOR
+			*(1.-.5*pow(abs(.025-mod(uv.y*.9,.05))/.025,2.))*.9;
+	}
+	
+	color=hud.rgb*hud.a+color*(1.-hud.a);//HUD transparency
+
+	//color adjustments
+	color=pow(abs(color),vec3(GAMMA))*BRIGHTNESS;
+	color=mix(vec3(length(color)),color,SATURATION);
+	fragColor = vec4(color,1.);
+}
+// --------[ Original ShaderToy ends here ]---------- //
 
 // --------------------------------- //
 // --------[ ICON Drawing]---------- //
@@ -721,6 +811,174 @@ void iconImage(out vec4 fragColor, in vec2 fragCoord) {
     fragColor = getBitmapColor(uv);
 }
 
+// --------------------------------- //
+// --------[ Text Drawing]---------- //
+// --------------------------------- //
+
+vec2 uv;
+const vec2 ch_size  = vec2(1.0, 2.0) * 0.6;              // character size (Y,X)
+const vec2 ch_space = ch_size + vec2(1.0, 1.0);    // character distance Vector(X,Y)
+const vec2 ch_start = vec2 (ch_space.x * -1.75, 3.25); // start position
+      vec2 ch_pos   = vec2 (0.0, 0.0);             // character position(X,Y)
+#define REPEAT_SIGN false // True/False; True=Multiple, False=Single
+
+#define n0 ddigit(0x22FF);
+#define n1 ddigit(0x0281);
+#define n2 ddigit(0x1177);
+#define n3 ddigit(0x11E7);
+#define n4 ddigit(0x5508);
+#define n5 ddigit(0x11EE);
+#define n6 ddigit(0x11FE);
+#define n7 ddigit(0x2206);
+#define n8 ddigit(0x11FF);
+#define n9 ddigit(0x11EF);
+
+#define A ddigit(0x119F);
+#define B ddigit(0x927E);
+#define C ddigit(0x007E);
+#define D ddigit(0x44E7);
+#define E ddigit(0x107E);
+#define F ddigit(0x101E);
+#define G ddigit(0x807E);
+#define H ddigit(0x1199);
+#define I ddigit(0x4466);
+#define J ddigit(0x4436);
+#define K ddigit(0x9218);
+#define L ddigit(0x0078);
+#define M ddigit(0x0A99);
+#define N ddigit(0x8899);
+#define O ddigit(0x00FF);
+#define P ddigit(0x111F);
+#define Q ddigit(0x80FF);
+#define R ddigit(0x911F);
+#define S ddigit(0x8866);
+#define T ddigit(0x4406);
+#define U ddigit(0x00F9);
+#define V ddigit(0x2218);
+#define W ddigit(0xA099);
+#define X ddigit(0xAA00);
+#define Y ddigit(0x4A00);
+#define Z ddigit(0x2266);
+#define _ ch_pos.x += ch_space.x;
+#define s_dot     ddigit(0);
+#define s_minus   ddigit(0x1100);
+#define s_plus    ddigit(0x5500);
+#define s_greater ddigit(0x2800);
+#define s_less    ddigit(0x8200);
+#define s_sqrt    ddigit(0x0C02);
+#define nl1 ch_pos = ch_start;  ch_pos.y -= 3.0;
+#define nl2 ch_pos = ch_start;  ch_pos.y -= 6.0;
+#define nl3 ch_pos = ch_start;	ch_pos.y -= 9.0;
+#define nl4 ch_pos = ch_start;	ch_pos.y -= 12.0;
+
+float dseg(vec2 p0, vec2 p1)
+{
+	vec2 dir = normalize(p1 - p0);
+	vec2 cp = (uv - ch_pos - p0) * mat2(dir.x, dir.y,-dir.y, dir.x);
+	return distance(cp, clamp(cp, vec2(0), vec2(distance(p0, p1), 0)));   
+}
+
+bool bit(int n, int b)
+{
+	return mod(floor(float(n) / exp2(floor(float(b)))), 2.0) != 0.0;
+}
+
+float d = 1e6;
+
+void ddigit(int n)
+{
+	float v = 1e6;	
+	vec2 cp = uv - ch_pos;
+	if (n == 0)     v = min(v, dseg(vec2(-0.405, -1.000), vec2(-0.500, -1.000)));
+	if (bit(n,  0)) v = min(v, dseg(vec2( 0.500,  0.063), vec2( 0.500,  0.937)));
+	if (bit(n,  1)) v = min(v, dseg(vec2( 0.438,  1.000), vec2( 0.063,  1.000)));
+	if (bit(n,  2)) v = min(v, dseg(vec2(-0.063,  1.000), vec2(-0.438,  1.000)));
+	if (bit(n,  3)) v = min(v, dseg(vec2(-0.500,  0.937), vec2(-0.500,  0.062)));
+	if (bit(n,  4)) v = min(v, dseg(vec2(-0.500, -0.063), vec2(-0.500, -0.938)));
+	if (bit(n,  5)) v = min(v, dseg(vec2(-0.438, -1.000), vec2(-0.063, -1.000)));
+	if (bit(n,  6)) v = min(v, dseg(vec2( 0.063, -1.000), vec2( 0.438, -1.000)));
+	if (bit(n,  7)) v = min(v, dseg(vec2( 0.500, -0.938), vec2( 0.500, -0.063)));
+	if (bit(n,  8)) v = min(v, dseg(vec2( 0.063,  0.000), vec2( 0.438, -0.000)));
+	if (bit(n,  9)) v = min(v, dseg(vec2( 0.063,  0.063), vec2( 0.438,  0.938)));
+	if (bit(n, 10)) v = min(v, dseg(vec2( 0.000,  0.063), vec2( 0.000,  0.937)));
+	if (bit(n, 11)) v = min(v, dseg(vec2(-0.063,  0.063), vec2(-0.438,  0.938)));
+	if (bit(n, 12)) v = min(v, dseg(vec2(-0.438,  0.000), vec2(-0.063, -0.000)));
+	if (bit(n, 13)) v = min(v, dseg(vec2(-0.063, -0.063), vec2(-0.438, -0.938)));
+	if (bit(n, 14)) v = min(v, dseg(vec2( 0.000, -0.938), vec2( 0.000, -0.063)));
+	if (bit(n, 15)) v = min(v, dseg(vec2( 0.063, -0.063), vec2( 0.438, -0.938)));
+	ch_pos.x += ch_space.x;
+	d = min(d, v);
+}
+
+vec3 hsv2rgb_smooth( in vec3 c )
+{
+    vec3 rgb = clamp( abs(mod(c.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0 );
+
+	rgb = rgb*rgb*(3.0-2.0*rgb); // cubic smoothing	
+
+	return c.z * mix( vec3(1.0), rgb, c.y);
+}
+
+void mainText( out vec4 fragColor, in vec2 fragCoord ) 
+{
+	
+	vec2 aspect = (resolution.xy / resolution.y) + 0.2;
+	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
+	float _d =  1.0-length(uv);
+	uv *= 18.0 ;
+	uv -= vec2(-7., 1.);
+
+	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.5,0.5));
+	uv.x += 0.7+sin(iTime+uv.y*0.7)*0.5;
+	ch_pos = ch_start;
+	
+	
+	nl1
+	nl2
+	_ _ L I G H T A M P nl3
+
+
+	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*2.0));  // shading
+	fragColor = vec4(color, 1.0);
+}
+
+void secText( out vec4 fragColor, in vec2 fragCoord ) 
+{
+	
+	vec2 aspect = (resolution.xy / resolution.y) - 1.3;
+	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
+	float _d =  1.0-length(uv);
+	uv *= 18.0 ;
+	uv -= vec2(-7., 1.);
+
+	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.5,0.5));
+	uv.x += -60.0 + (iTime*3);
+	ch_pos = ch_start;
+	
+	s_dot s_dot s_dot A _ N E W _ F R E S H _ R E L E A S E _ F O R _ U s_dot s_dot s_dot
+	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*1.0));  // shading
+	fragColor = vec4(color, 1.0);
+}
+
+void thirdText( out vec4 fragColor, in vec2 fragCoord ) 
+{
+	
+	vec2 aspect = (resolution.xy / resolution.y) + 0.3;
+	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
+	float _d =  1.0-length(uv);
+	uv *= 18.0 ;
+	uv -= vec2(-7., 1.);
+
+	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.5,0.5));
+	uv.x += -60.0 + ((iTime-14)*3);
+	ch_pos = ch_start;
+	
+	A T _ F I R S T _ T H A N K _ Y O U _ A L L _ F O R _ B E I N G _ A W E S O M E s_dot _ N O W _ T H X _ T O _ M Y _ C O M P U T E R _ F O R _ N O T _ C R A S H I N G s_dot _ 
+	N O _ T H X _ T O _ W I N D O W S _ F O R _ B E I N G _ C R A P _ S I N C E _ n8 n5 s_dot _ _
+	R U N N I N G _ O U T _ O F _ T E X T _ D O N T _ K N O W _ W H A T _ T O _ S A Y s_dot _ N A H s_dot  _ E N J O Y _ T H E _ A N I M A T I O N _ A N D _ M U S I C s_dot
+	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*1.0));  // shading
+	fragColor = vec4(color, 1.0);
+}
 
 void main(void)
 {
@@ -728,11 +986,28 @@ void main(void)
     vec4 scroltext_FragColor;
     vec4 IconImage_FragColor;
     
-    iconImage(IconImage_FragColor, gl_FragCoord.xy);
-    mainImage(gl_FragColor, gl_FragCoord.xy);
-    mainText(text_FragColor, gl_FragCoord.xy);
-    secText(scroltext_FragColor, gl_FragCoord.xy);
-    gl_FragColor += IconImage_FragColor;
-    gl_FragColor += text_FragColor;
-    gl_FragColor += scroltext_FragColor;
+
+    if (time < 7801 && time > 0)
+    {
+		mainText(text_FragColor, gl_FragCoord.xy);
+		gl_FragColor = text_FragColor / (time/12000);
+	}
+	else if (time < 22500 && time > 7800)
+	{
+		mainText(text_FragColor, gl_FragCoord.xy);
+		gl_FragColor = text_FragColor;
+		
+		iconImage(IconImage_FragColor, gl_FragCoord.xy);
+		gl_FragColor += IconImage_FragColor;
+
+		secText(scroltext_FragColor, gl_FragCoord.xy);
+		gl_FragColor += scroltext_FragColor;
+	}
+	else
+	{
+		mainImage(gl_FragColor, gl_FragCoord.xy);
+		gl_FragColor.a = 1.0;
+		thirdText(scroltext_FragColor, gl_FragCoord.xy);
+		gl_FragColor += scroltext_FragColor;
+	}
 }
