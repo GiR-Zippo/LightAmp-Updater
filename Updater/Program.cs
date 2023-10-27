@@ -12,9 +12,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
-using System.Runtime.InteropServices.ComTypes;
-using NAudio.CoreAudioApi;
-using System.Runtime.InteropServices;
 
 namespace Updater
 {
@@ -157,7 +154,7 @@ void main(void)
             program["resolution"].SetValue(new Vector2(width, height));
             program["time"].SetValue((float)timer.ElapsedMilliseconds);
 
-            //Console.WriteLine(timer.ElapsedMilliseconds);
+            Console.WriteLine(timer.ElapsedMilliseconds);
 
             // bind the vertex attribute arrays for the square (the easy way)
             Gl.BindBufferToShaderAttribute(square, program, "vertexPosition");
@@ -181,7 +178,7 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\symmetric4.xm";
+                modfile = @"Data\mario1_1.s3m";
                 shader = File.ReadAllText(@"Data\Shader.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }
