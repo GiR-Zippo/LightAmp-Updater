@@ -282,9 +282,6 @@
     <None Include="Data\mario1_1.s3m">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Data\ShaderAmp1056.frag">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="Data\ShaderAmp1055.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -315,7 +312,7 @@
     <None Include="Data\ShaderAmp1034.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Data\ShaderAmp1057.frag" />
+    <None Include="Data\ShaderAmp1060.frag" />
     <None Include="Data\summer_memories_3.xm" />
     <None Include="Data\sun_over_chaos.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

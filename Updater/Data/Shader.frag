@@ -858,6 +858,7 @@ float text(vec2 uv)
     col += character(ch_exc,uv);
     col += character(ch_exc,uv);
     
+    col += character(ch_spc,uv);
     col += character(ch_D,uv);
     col += character(ch_T,uv);
     col += character(ch_spc,uv);
@@ -878,6 +879,7 @@ float text(vec2 uv)
     col += character(ch_spc,uv);
     col += character(ch_G,uv);
     col += character(ch_R,uv);
+    col += character(ch_E,uv);
     col += character(ch_E,uv);
     col += character(ch_T,uv);
     col += character(ch_I,uv);
