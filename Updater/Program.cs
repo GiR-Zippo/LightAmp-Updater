@@ -178,7 +178,7 @@ void main(void)
 
             if (debug)
             {
-                modfile = @"Data\mario1_1.s3m";
+                modfile = @"Data\herb-cute_waves.xm";
                 shader = File.ReadAllText(@"Data\Shader.frag");
                 return new KeyValuePair<string, string>(shader, modfile);
             }

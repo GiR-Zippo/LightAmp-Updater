@@ -275,8 +275,14 @@
     <None Include="Data\external.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Data\herb-cute_waves.xm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="Data\m-fp.xm" />
     <None Include="Data\mario1_1.s3m">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\ShaderAmp1056.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Data\ShaderAmp1055.frag">
@@ -309,11 +315,14 @@
     <None Include="Data\ShaderAmp1034.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Data\ShaderAmp1057.frag" />
     <None Include="Data\summer_memories_3.xm" />
     <None Include="Data\sun_over_chaos.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Data\symmetric4.xm" />
+    <None Include="Data\symmetric4.xm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="Data\Tune.info" />
     <None Include="Data\WTF2.XM" />
     <None Include="libraries\freeglut.dll.config" />

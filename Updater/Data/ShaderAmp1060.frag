@@ -1,4 +1,4 @@
-﻿// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
+// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License
 // Tune: herb-cute_waves.xm
 
 #version 330
