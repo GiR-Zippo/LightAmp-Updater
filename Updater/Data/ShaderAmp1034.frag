@@ -1,4 +1,5 @@
-﻿#version 330
+﻿// Tune: beach.xm
+#version 330
 
 #ifdef GL_ES
 precision mediump float;

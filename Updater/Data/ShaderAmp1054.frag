@@ -1,7 +1,8 @@
-﻿//external.xm
-/*
+﻿/*
  * Original shader from: https://www.shadertoy.com/view/XtfGzj
  */
+// Tune: external.xm
+
 #version 330
 
 #ifdef GL_ES

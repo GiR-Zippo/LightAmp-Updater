@@ -1,7 +1,7 @@
 ﻿/*
  * Original shader from: https://www.shadertoy.com/view/XtlSD7
  */
-//mario1_1.s3m
+// Tune: mario1_1.s3m
 
 //#extension GL_OES_standard_derivatives : enable
 

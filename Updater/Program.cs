@@ -12,6 +12,8 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
+using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Updater
 {
@@ -27,6 +29,8 @@ namespace Updater
 
         private static Module m_Mod = null;
         private static MikMod m_Player;
+
+        public static bool debug = false;
 
         public static string VertexShader = @"
 #version 440
@@ -51,10 +55,46 @@ void main(void)
 
         }
 
+        public static void PrintHelp()
+        {
+            Console.WriteLine("Syntax: LightAmp-Updater.exe shader=path/to/shader.frag music=path/to/music.xm");
+            Console.ReadLine();
+            return;
+        }
+
+        [STAThread]
         static void Main(string[] args)
         {
-            bool debug = false;
-            var datas = ReadConfig(debug);
+            debug = args.Count() > 0 ? true : false;
+            KeyValuePair<string, string> datas;
+
+            if (debug)
+            {
+                string modfile = "";// @"Data\herb-cute_waves.xm";
+                string shader = ""; // File.ReadAllText(@"Data\Shader.frag");
+
+                foreach (var arg in args)
+                {
+                    if (arg.Split('=')[0] == "shader")
+                    {
+                        if (File.Exists(arg.Split('=')[1]))
+                            shader = File.ReadAllText(arg.Split('=')[1]);
+                    }
+                    if (arg.Split('=')[0] == "music")
+                        if (File.Exists(arg.Split('=')[1]))
+                            modfile = arg.Split('=')[1];
+                    if (arg.Split('=')[0] == "help")
+                        break;
+                }
+                if (shader == "" || modfile == "")
+                {
+                    PrintHelp();
+                    return;
+                }
+                datas = new KeyValuePair<string, string>(shader, modfile);
+            }
+            else
+                datas = ReadConfig();
 
             if (!debug)
                 _ = CheckVersion();
@@ -154,7 +194,8 @@ void main(void)
             program["resolution"].SetValue(new Vector2(width, height));
             program["time"].SetValue((float)timer.ElapsedMilliseconds);
 
-            Console.WriteLine(timer.ElapsedMilliseconds);
+            if (debug)
+                Console.WriteLine(timer.ElapsedMilliseconds);
 
             // bind the vertex attribute arrays for the square (the easy way)
             Gl.BindBufferToShaderAttribute(square, program, "vertexPosition");
@@ -171,17 +212,10 @@ void main(void)
         /// </summary>
         /// <param name="debug"></param>
         /// <returns></returns>
-        private static KeyValuePair<string, string> ReadConfig(bool debug)
+        private static KeyValuePair<string, string> ReadConfig()
         {
             string shader = "";
             string modfile = "";
-
-            if (debug)
-            {
-                modfile = @"Data\herb-cute_waves.xm";
-                shader = File.ReadAllText(@"Data\Shader.frag");
-                return new KeyValuePair<string, string>(shader, modfile);
-            }
 
             HttpClient Client = new HttpClient();
             Client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue
