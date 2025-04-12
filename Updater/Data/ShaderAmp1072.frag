@@ -351,7 +351,7 @@ void thirdText( out vec4 fragColor, in vec2 fragCoord )
 	I T _ I S _ T I M E _ A G A I N _ F O R _ A _ N E W _ U P D A T E s_dot s_dot s_dot _
     T H X _ M A B B Y _ F O R _ D O I N G _ T H E _ P R E V I E V _ S T U F F _
 	A N D _ O F _ C O U R S E _ G Z _ G L A C I O U S _ F O R _ T A K I N G _ O V E R _ T H E _ B M P _ s_dot
-    S T A Y _ A W E S O M E _ A N D _ K E E P _ O N _ D O O T I N G s_dot _ _ _ 
+    S T A Y _ A W E S O M E _ A N D _ K E E P _ O N _ D O O T I N G s_dot _ _ _
 
 	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*1.0));  // shading
 	fragColor = vec4(color, 1.0);
