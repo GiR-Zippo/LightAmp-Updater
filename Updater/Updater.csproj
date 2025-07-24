@@ -278,6 +278,7 @@
     <None Include="Data\herb-cute_waves.xm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="Data\ko0x_-_nur_ein_wort.it" />
     <None Include="Data\m-fp.xm" />
     <None Include="Data\mario1_1.s3m">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -321,6 +322,10 @@
     <None Include="Data\symmetric4.xm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="Data\synth_c_afs.xm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\TestShader.frag" />
     <None Include="Data\Tune.info" />
     <None Include="Data\WTF2.XM" />
     <None Include="libraries\freeglut.dll.config" />

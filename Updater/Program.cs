@@ -1,19 +1,18 @@
-﻿using System;
-using Tao.FreeGlut;
-using OpenGL;
-using System.Diagnostics;
+﻿using OpenGL;
 using SharpMik;
-using SharpMik.Player;
 using SharpMik.Drivers;
+using SharpMik.Player;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Windows;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading.Tasks;
-using System.Net.Http.Headers;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Threading.Tasks;
+using System.Windows;
+using Tao.FreeGlut;
 
 namespace Updater
 {
@@ -78,7 +77,19 @@ void main(void)
                     if (arg.Split('=')[0] == "shader")
                     {
                         if (File.Exists(arg.Split('=')[1]))
+                        {
                             shader = File.ReadAllText(arg.Split('=')[1]);
+                            var result = shader.Split(new[] { '\r', '\n' });
+                            foreach (string line in result)
+                                if (line.Contains("Tune:"))
+                                {
+                                    string tune = line.Split(':').Last();
+                                    tune = Path.GetDirectoryName(arg.Split('=')[1]) + "\\" + tune.Trim();
+                                    if (File.Exists(tune))
+                                        modfile = tune;
+                                }
+                        }
+                        
                     }
                     if (arg.Split('=')[0] == "music")
                         if (File.Exists(arg.Split('=')[1]))
@@ -120,8 +131,11 @@ void main(void)
             Glut.glutInit();
             Glut.glutInitDisplayMode(Glut.GLUT_DEPTH);
             Glut.glutInitWindowSize(width, height);
+#if DEBUG
+            Glut.glutCreateWindow("ShaderDebug");
+#else
             Glut.glutCreateWindow("Downloading...");
-
+#endif
             Console.WriteLine(Gl.GetString(StringName.ShadingLanguageVersion));
 
             // provide the Glut callbacks that are necessary for running this tutorial
