@@ -1,4 +1,7 @@
-﻿// Tune: synth_c_afs.xm
+﻿/*
+ * Original shader from: https://www.shadertoy.com/view/wd23zz
+ */
+// Tune: ko0x_-_nur_ein_wort.it
 
 #version 330
 
@@ -899,28 +902,6 @@ void mainText( out vec4 fragColor, in vec2 fragCoord )
 }
 
 
-void thirdText( out vec4 fragColor, in vec2 fragCoord ) 
-{
-	vec2 aspect = (resolution.xy / resolution.y) + 0.3;
-	uv = ( fragCoord.xy / resolution.y ) - aspect / 2.0;
-	float _d =  1.0-length(uv);
-	uv *= 18.0 ;
-	uv -= vec2(-7., 1.);
-
-	vec3 ch_color = hsv2rgb_smooth(vec3(iTime*0.4+uv.y*0.1,0.8,0.8));
-	uv.y +=14.0;
-	uv.x += -53.0 + ((iTime-14)*3);
-	ch_pos = ch_start;
-	
-	D O N T _ W O R R Y _ F I L O _ I S _ F I N E _ s_minus _
-    H E R E _ W E _ H A V E _ A _ N E W _ R E L E A S E _ W I T H _ S O M E _
-	F I X E S _ A N D _ N E W _ S T U F F s_dot _
-    H A V E _ F U N _ A N D _ H A P P Y _ D O O T I N G _ s_dot _ _ 
-
-	vec3 color = mix(ch_color, vec3(0,0,0), 1.0- (0.09 / d*1.0));  // shading
-	fragColor = vec4(color, 1.0);
-}
-
 //fadeStartTime and FadeTime absolute time
 void Blend(out vec4 fragColor, in vec4 inColor, in int fadeStartTime, in int fadeTime) 
 {
@@ -954,9 +935,6 @@ void main(void)
     mainText(text_FragColor, gl_FragCoord.xy);
     if (time < 22000)
         Blend(text_FragColor, text_FragColor, 7600, 22000);
-
-    if (time > 22000)
-        thirdText(scroltext_FragColor, gl_FragCoord.xy);
 
     Picture(picture_FragColor, gl_FragCoord.xy);
 
