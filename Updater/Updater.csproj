@@ -278,9 +278,15 @@
     <None Include="Data\herb-cute_waves.xm">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="Data\hotdogs.xm">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\ko0x_-_nur_ein_wort.it" />
     <None Include="Data\m-fp.xm" />
     <None Include="Data\mario1_1.s3m">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\ShaderAmp1073.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Data\ShaderAmp1055.frag">
@@ -313,8 +319,12 @@
     <None Include="Data\ShaderAmp1034.frag">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="Data\ShaderAmp1060.frag" />
-    <None Include="Data\ShaderAmp1072.frag" />
+    <None Include="Data\ShaderAmp1060.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Data\ShaderAmp1072.frag">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Data\summer_memories_3.xm" />
     <None Include="Data\sun_over_chaos.xm">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
